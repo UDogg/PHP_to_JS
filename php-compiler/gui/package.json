@@ -1,0 +1,12 @@
+{
+    "name": "php-native-compiler",
+    "version": "1.0.0",
+    "main": "gui/main.js",
+    "scripts": {
+      "start": "electron .",
+      "build-compiler": "gcc c_core/phc.c -o c_core/phc"
+    },
+    "devDependencies": {
+      "electron": "^28.0.0"
+    }
+  }

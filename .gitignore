@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Compiled Binaries
+c_core/phc
+c_core/phc.exe
+temp/program
+temp/program.exe
+
+# Intermediate Files
+temp/output.c
+temp/input.php
+
+# OS Files
+.DS_Store
+Thumbs.db
