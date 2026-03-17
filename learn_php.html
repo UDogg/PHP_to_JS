@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHP Learning Studio - No Server Required</title>
+
+<!-- PHP WASM via CDN (UMD build for browser compatibility) -->
+<script src="https://cdn.jsdelivr.net/npm/@php-wasm/universal@0.9.46/dist/umd/index.js"></script>
+
+<style>
+:root {
+    --bg: #121212; --panel: #1e1e1e; --border: #333; --text: #e0e0e0;
+    --accent: #7e57c2; --success: #66bb6a; --error: #ef5350;
+    --php-tag: #569cd6; --php-var: #9cdcfe; --php-str: #ce9178;
+    --php-func: #dcdcaa; --php-kw: #c586c0; --php-comment: #6a9955;
+}
+[data-theme="light"] {
+    --bg: #f5f5f5; --panel: #ffffff; --border: #ddd; --text: #333;
+    --php-tag: #0000ff; --php-var: #001080; --php-str: #a31515;
+    --php-func: #795e26; --php-kw: #0000ff; --php-comment: #008000;
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0; font-family: 'Consolas', 'Monaco', monospace;
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; height: 100vh;
+    transition: background 0.3s, color 0.3s;
+}
+
+/* Header */
+header {
+    background: var(--panel); padding: 10px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+header h1 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+.badge {
+    background: var(--accent); color: white; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.75rem; font-family: sans-serif;
+}
+.status { font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--error); }
+.status-dot.ready { background: var(--success); }
+.status-dot.loading { background: #ffa726; animation: pulse 1s infinite; }
+
+@keyframes pulse { 50% { opacity: 0.5; } }
+
+/* Mode Tabs */
+.mode-bar {
+    background: var(--panel); padding: 5px 20px;
+    display: flex; gap: 5px; border-bottom: 1px solid var(--border);
+}
+.mode-btn {
+    padding: 8px 16px; background: transparent; border: 1px solid var(--border);
+    color: var(--text); cursor: pointer; border-radius: 4px 4px 0 0;
+    font-family: inherit; font-size: 0.9rem;
+}
+.mode-btn.active {
+    background: var(--bg); border-bottom: 2px solid var(--accent);
+    font-weight: bold;
+}
+.mode-btn:hover:not(.active) { background: rgba(255,255,255,0.05); }
+
+/* Workspace */
+.workspace {
+    display: flex; flex: 1; overflow: hidden;
+}
+
+/* Editor Pane */
+.editor-pane {
+    flex: 1; display: flex; flex-direction: column;
+    border-right: 1px solid var(--border);
+}
+.toolbar {
+    padding: 8px; background: var(--panel);
+    display: flex; gap: 8px; align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+.toolbar button, .toolbar select {
+    padding: 6px 12px; background: var(--accent);
+    color: white; border: none; border-radius: 4px;
+    cursor: pointer; font-family: inherit; font-size: 0.85rem;
+}
+.toolbar button.secondary { background: #444; }
+.toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+.toolbar select { background: #333; color: white; border: 1px solid #555; }
+
+#editor {
+    flex: 1; background: var(--panel); color: var(--text);
+    border: none; padding: 15px; font-size: 14px;
+    line-height: 1.5; resize: none; outline: none;
+    font-family: inherit; white-space: pre; overflow: auto;
+}
+
+/* Output Pane */
+.output-pane {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--bg);
+}
+.output-tabs {
+    display: flex; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+}
+.output-tab {
+    padding: 8px 16px; cursor: pointer;
+    border-right: 1px solid var(--border);
+    font-family: sans-serif; font-size: 0.85rem;
+    background: transparent; color: var(--text);
+}
+.output-tab.active {
+    background: var(--bg); border-bottom: 2px solid var(--accent);
+    font-weight: bold;
+}
+.output-panel {
+    flex: 1; padding: 15px; overflow: auto;
+    display: none; font-family: 'Segoe UI', sans-serif;
+}
+.output-panel.active { display: block; }
+
+/* Output Styles */
+#browser-output { background: #fff; color: #333; }
+#browser-output pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+#browser-output code { font-family: inherit; }
+
+/* Console & Debugger */
+#console-output, #debug-output, #network-output {
+    font-family: 'Consolas', monospace; font-size: 0.85rem;
+    background: var(--panel); padding: 10px;
+    border-radius: 4px; min-height: 100%;
+}
+.log-entry { margin: 4px 0; padding-left: 10px; border-left: 2px solid #555; }
+.log-entry.error { border-left-color: var(--error); color: var(--error); }
+.log-entry.success { border-left-color: var(--success); }
+.log-entry.info { border-left-color: var(--accent); }
+
+.debug-var { 
+    display: flex; justify-content: space-between; 
+    padding: 4px 8px; background: rgba(255,255,255,0.05);
+    margin: 2px 0; border-radius: 3px;
+}
+.debug-name { color: var(--php-var); font-weight: bold; }
+.debug-value { color: var(--php-str); }
+
+/* Network Console */
+.net-entry { 
+    margin: 12px 0; padding: 10px; 
+    background: rgba(0,0,0,0.2); border-radius: 4px;
+    border-left: 3px solid var(--accent);
+}
+.net-header { 
+    display: flex; justify-content: space-between; 
+    font-size: 0.8rem; color: #888; margin-bottom: 5px;
+}
+.net-payload { 
+    background: #000; padding: 8px; 
+    border-radius: 3px; font-size: 0.8rem; 
+    overflow-x: auto; color: #0f0;
+}
+
+/* Loading Overlay */
+#loading-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8); display: flex;
+    flex-direction: column; justify-content: center; align-items: center;
+    z-index: 1000; display: none;
+}
+#loading-overlay.show { display: flex; }
+.loader {
+    width: 40px; height: 40px; border: 4px solid #333;
+    border-top: 4px solid var(--accent); border-radius: 50%;
+    animation: spin 1s linear infinite; margin-bottom: 15px;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .workspace { flex-direction: column; }
+    .editor-pane { border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<header>
+    <h1>
+        PHP Learning Studio 
+        <span class="badge">No Server</span>
+    </h1>
+    <div class="status">
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status-text">Initializing...</span>
+    </div>
+</header>
+
+<div class="mode-bar">
+    <button class="mode-btn active" data-mode="beginner">Beginner</button>
+    <button class="mode-btn" data-mode="advanced">Advanced</button>
+    <button class="mode-btn" data-mode="wasm" id="wasm-btn">Real PHP (WASM)</button>
+</div>
+
+<div class="workspace">
+    <!-- Editor -->
+    <div class="editor-pane">
+        <div class="toolbar">
+            <button id="run-btn" onclick="runCode()">▶ Run</button>
+            <button class="secondary" onclick="clearOutput()">Clear</button>
+            <button class="secondary" onclick="saveCode()">💾 Save</button>
+            <button class="secondary" onclick="loadCode()">📂 Load</button>
+            <select id="lesson-select" onchange="loadLesson(this.value)">
+                <option value="">-- Select Lesson --</option>
+                <option value="hello">Hello World</option>
+                <option value="variables">Variables & Types</option>
+                <option value="arrays">Arrays & Loops</option>
+                <option value="functions">Functions</option>
+                <option value="oop">Classes & OOP</option>
+                <option value="json">JSON Handling</option>
+                <option value="rpc">RPC Simulation</option>
+                <option value="grpc">gRPC Simulation</option>
+                <option value="files">File Operations</option>
+            </select>
+            <select id="theme-select" onchange="changeTheme(this.value)" style="margin-left:auto">
+                <option value="dark">🌙 Dark</option>
+                <option value="light">☀️ Light</option>
+            </select>
+        </div>
+        <textarea id="editor" spellcheck="false" placeholder="Write PHP code here..."></textarea>
+    </div>
+
+    <!-- Output -->
+    <div class="output-pane">
+        <div class="output-tabs">
+            <button class="output-tab active" data-tab="browser">🌐 Output</button>
+            <button class="output-tab" data-tab="console">📋 Console</button>
+            <button class="output-tab" data-tab="debug">🔍 Debugger</button>
+            <button class="output-tab" data-tab="network">🌍 Network</button>
+        </div>
+        <div id="browser-output" class="output-panel active"></div>
+        <div id="console-output" class="output-panel"></div>
+        <div id="debug-output" class="output-panel"></div>
+        <div id="network-output" class="output-panel"></div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+    <div class="loader"></div>
+    <div>Loading PHP Engine (~20MB)...</div>
+    <div style="font-size:0.8rem;color:#888;margin-top:10px">First load may take 30-60 seconds</div>
+</div>
+
+<script>
+/**
+ * PHP Learning Studio
+ * A single-file PHP learning environment with WASM support
+ */
+
+// === STATE ===
+const state = {
+    mode: 'beginner', // beginner | advanced | wasm
+    phpInstance: null,
+    wasmReady: false,
+    theme: localStorage.getItem('php_theme') || 'dark'
+};
+
+// === DOM ELEMENTS ===
+const els = {
+    editor: document.getElementById('editor'),
+    runBtn: document.getElementById('run-btn'),
+    wasmBtn: document.getElementById('wasm-btn'),
+    statusDot: document.getElementById('status-dot'),
+    statusText: document.getElementById('status-text'),
+    loading: document.getElementById('loading-overlay'),
+    outputs: {
+        browser: document.getElementById('browser-output'),
+        console: document.getElementById('console-output'),
+        debug: document.getElementById('debug-output'),
+        network: document.getElementById('network-output')
+    }
+};
+
+// === INITIALIZATION ===
+function init() {
+    // Apply saved theme
+    document.documentElement.setAttribute('data-theme', state.theme);
+    document.getElementById('theme-select').value = state.theme;
+    
+    // Load saved code
+    const saved = localStorage.getItem('php_code');
+    els.editor.value = saved || getDefaultCode();
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Initialize WASM (async)
+    initWASM();
+    
+    // Run initial code
+    runCode();
+}
+
+function setupEventListeners() {
+    // Mode switching
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const mode = e.currentTarget.dataset.mode;
+            if (mode === 'wasm' && !state.wasmReady) {
+                showToast('WASM not ready yet. Try again in a moment.', 'info');
+                return;
+            }
+            state.mode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            updateUI();
+            runCode();
+        });
+    });
+    
+    // Tab switching
+    document.querySelectorAll('.output-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            const tabName = e.currentTarget.dataset.tab;
+            document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.output-panel').forEach(p => p.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            document.getElementById(`${tabName}-output`).classList.add('active');
+        });
+    });
+    
+    // Auto-run on Ctrl+Enter
+    els.editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            runCode();
+        }
+    });
+}
+
+async function initWASM() {
+    updateStatus('loading', 'Loading PHP engine...');
+    
+    try {
+        // Check if library loaded
+        if (typeof PHP === 'undefined') {
+            throw new Error('php-wasm library not loaded');
+        }
+        
+        // Initialize PHP instance
+        state.phpInstance = new PHP();
+        await state.phpInstance.load();
+        
+        // Setup virtual filesystem
+        await state.phpInstance.mkdir('/www');
+        await state.phpInstance.writeFile('/www/index.php', '<?php echo "WASM Ready!"; ?>');
+        
+        state.wasmReady = true;
+        updateStatus('ready', 'PHP 8.2 (WASM)');
+        els.wasmBtn.disabled = false;
+        showToast('PHP WASM engine loaded successfully!', 'success');
+        
+    } catch (error) {
+        console.error('WASM init failed:', error);
+        updateStatus('error', 'WASM unavailable - using simulation');
+        els.wasmBtn.disabled = true;
+        els.wasmBtn.title = 'WASM failed to load. Using simulation mode.';
+        showToast('WASM failed to load. Using simulation mode instead.', 'error');
+    }
+}
+
+function updateStatus(status, text) {
+    els.statusDot.className = `status-dot ${status}`;
+    els.statusText.textContent = text;
+}
+
+function updateUI() {
+    // Update run button text based on mode
+    const labels = {
+        beginner: '▶ Run (Simulated)',
+        advanced: '▶ Run (Advanced)',
+        wasm: '▶ Run (Real PHP)'
+    };
+    els.runBtn.textContent = labels[state.mode];
+    
+    // Disable WASM button if not ready
+    els.wasmBtn.disabled = !state.wasmReady;
+}
+
+// === CODE EXECUTION ===
+async function runCode() {
+    clearOutput();
+    const code = els.editor.value;
+    
+    try {
+        if (state.mode === 'wasm' && state.wasmReady) {
+            await runWASM(code);
+        } else if (state.mode === 'advanced') {
+            runAdvanced(code);
+        } else {
+            runBeginner(code);
+        }
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// --- BEGINNER MODE (Regex Simulation) ---
+function runBeginner(code) {
+    let js = cleanPHP(code);
+    
+    // === STEP 1: Simulate PHP built-in functions ===
+    const phpFunctions = `
+        function gettype(v) {
+            if (v === null) return "NULL";
+            if (Array.isArray(v)) return "array";
+            return typeof v;
+        }
+        function isset(v) { return v !== undefined && v !== null; }
+        function empty(v) { return !v || v === "" || v === "0" || v === 0 || v === false; }
+        function count(v) { return Array.isArray(v) ? v.length : (v ? 1 : 0); }
+        function strlen(s) { return String(s).length; }
+        function strtolower(s) { return String(s).toLowerCase(); }
+        function strtoupper(s) { return String(s).toUpperCase(); }
+        function trim(s) { return String(s).trim(); }
+        function in_array(needle, haystack) { return Array.isArray(haystack) && haystack.includes(needle); }
+        function array_push(arr, ...items) { if(Array.isArray(arr)) arr.push(...items); return arr.length; }
+        function print_r(v, return_output) {
+            const str = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+            if (return_output) return str;
+            browserOutput("<pre>" + str + "</pre>");
+        }
+        function var_dump(v) { browserOutput("<pre>" + gettype(v) + "(" + JSON.stringify(v) + ")</pre>"); }
+    `;
+    
+    // === STEP 2: Handle echo with string interpolation ===
+    js = js.replace(/echo\s+(.*?);/gs, (match, content) => {
+        // First, handle PHP string interpolation: "$var" → "${var}"
+        // Match double-quoted strings containing $word
+        let processed = content.replace(/"([^"]*\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*[^"]*)"/g, (str) => {
+            // Convert "$name" to "${name}" for JS template literal style, but keep as concatenation
+            return str.replace(/\$([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)/g, '" + $1 + "');
+        });
+        
+        // Handle single-quoted strings (no interpolation in PHP, so just convert to JS strings)
+        processed = processed.replace(/'([^']*)'/g, '"$1"');
+        
+        // Convert PHP concatenation (.) to JS (+), but be careful not to break the interpolation markers
+        processed = processed.replace(/\s*\.\s*/g, ' + ');
+        
+        return `browserOutput(${processed});`;
+    });
+    
+    // === STEP 3: Handle variables (just remove $) ===
+    // Must happen AFTER echo processing to avoid breaking string interpolation
+    js = js.replace(/\$(\w+)/g, '$1');
+    
+    // === STEP 4: Handle arrays ===
+    js = js.replace(/array\s*\((.*?)\)/gs, '[$1]');
+    
+    // === STEP 5: Assemble and execute ===
+    const fullCode = phpFunctions + '\n' + js;
+    
+    try {
+        const run = new Function('browserOutput', 'log', fullCode);
+        run(
+            (html) => els.outputs.browser.innerHTML += html,
+            (msg) => logToConsole(msg, 'info')
+        );
+    } catch (e) {
+        throw new Error(`Beginner mode parse error: ${e.message}\n\nGenerated JS:\n${fullCode}`);
+    }
+}
+
+// --- ADVANCED MODE (With Classes, Debug, etc.) ---
+function runAdvanced(code) {
+    let js = cleanPHP(code);
+    
+    // Variables
+    js = js.replace(/\$(\w+)/g, 'var $1');
+    
+    // Echo/Print
+    js = js.replace(/echo\s+(.*?);/gs, (m, c) => 
+        `browserOutput(${c.replace(/\./g, '+')});`);
+    js = js.replace(/print_r\s*\(\s*(\w+)\s*\)/g, 
+        'browserOutput("<pre>" + JSON.stringify($1, null, 2) + "</pre>")');
+    
+    // Classes
+    js = js.replace(/class\s+(\w+)/g, 'class $1');
+    js = js.replace(/public\s+function/g, '');
+    js = js.replace(/private\s+function/g, '');
+    js = js.replace(/protected\s+function/g, '');
+    js = js.replace(/->/g, '.');
+    js = js.replace(/__construct/g, 'constructor');
+    js = js.replace(/self::/g, 'this.constructor.');
+    
+    // Arrays
+    js = js.replace(/array\s*\((.*?)\)/gs, '[$1]');
+    js = js.replace(/count\s*\(\s*(\w+)\s*\)/g, '$1.length');
+    
+    // JSON
+    js = js.replace(/json_encode\s*\(\s*(\w+)\s*\)/g, 'JSON.stringify($1)');
+    js = js.replace(/json_decode\s*\(\s*(\w+)\s*,\s*true\s*\)/g, 'JSON.parse($1)');
+    
+    // Debug injection: track variable assignments
+    js = injectDebugger(js);
+    
+    // Simulated functions
+    js = js.replace(/rpc_call\s*\(\s*['"](\w+)['"]\s*,\s*(.*?)\s*\)/g, 
+        'simulateRPC("$1", $2)');
+    js = js.replace(/grpc_call\s*\(\s*['"]([\w.]+)['"]\s*,\s*(.*?)\s*\)/g, 
+        'simulateGRPC("$1", $2)');
+    js = js.replace(/file_get_contents\s*\(\s*['"]([^'"]+)['"]\s*\)/g, 
+        'simulateFileRead("$1")');
+    
+    // Execute
+    const run = new Function('browserOutput', 'log', 'debug', 
+        'simulateRPC', 'simulateGRPC', 'simulateFileRead', js);
+    
+    run(
+        (html) => els.outputs.browser.innerHTML += html,
+        (msg, type='info') => logToConsole(msg, type),
+        (name, val) => addDebugVar(name, val),
+        simulateRPC,
+        simulateGRPC,
+        simulateFileRead
+    );
+}
+
+// --- REAL PHP MODE (WASM) ---
+async function runWASM(code) {
+    if (!state.phpInstance || !state.wasmReady) {
+        throw new Error('WASM engine not ready');
+    }
+    
+    els.loading.classList.add('show');
+    
+    try {
+        // Write code to virtual filesystem
+        await state.phpInstance.writeFile('/www/script.php', code);
+        
+        // Execute via request handler (simulates web server)
+        const response = await state.phpInstance.requestHandler.request('/www/script.php');
+        
+        // Display output
+        els.outputs.browser.innerHTML = response.text || '(empty output)';
+        
+        // Log to console
+        if (response.errors) {
+            logToConsole(response.errors, 'error');
+        }
+        
+    } finally {
+        els.loading.classList.remove('show');
+    }
+}
+
+// === HELPER FUNCTIONS ===
+function cleanPHP(code) {
+    return code.replace(/<\?php/g, '').replace(/\?>/g, '');
+}
+
+function injectDebugger(code) {
+    // Inject debug calls after variable assignments
+    return code.replace(
+        /var\s+(\w+)\s*=\s*([^;]+);/g,
+        (match, name, value) => 
+            `var ${name} = ${value}; debug('${name}', ${name});`
+    );
+}
+
+function browserOutput(html) {
+    els.outputs.browser.innerHTML += html;
+}
+
+function logToConsole(message, type = 'info') {
+    const div = document.createElement('div');
+    div.className = `log-entry ${type}`;
+    div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    els.outputs.console.appendChild(div);
+    els.outputs.console.scrollTop = els.outputs.console.scrollHeight;
+}
+
+function addDebugVar(name, value) {
+    const div = document.createElement('div');
+    div.className = 'debug-var';
+    
+    let displayValue = value;
+    if (typeof value === 'object') {
+        displayValue = JSON.stringify(value).slice(0, 50) + '...';
+    }
+    
+    div.innerHTML = `<span class="debug-name">$${name}</span><span class="debug-value">${displayValue}</span>`;
+    els.outputs.debug.appendChild(div);
+}
+
+function handleError(error) {
+    const msg = error.message || String(error);
+    els.outputs.browser.innerHTML = `
+        <div style="background:#ffebee;color:#c62828;padding:15px;border-radius:4px">
+            <strong>❌ Error:</strong> ${msg}<br>
+            <small>Mode: ${state.mode}</small>
+        </div>
+    `;
+    logToConsole(msg, 'error');
+    console.error(error);
+}
+
+function clearOutput() {
+    Object.values(els.outputs).forEach(el => el.innerHTML = '');
+}
+
+function showToast(message, type = 'info') {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px;
+        background: ${type === 'error' ? '#ef5350' : type === 'success' ? '#66bb6a' : '#7e57c2'};
+        color: white; padding: 12px 20px; border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1001;
+        animation: slideIn 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// === SIMULATED BACKEND FUNCTIONS ===
+const MockAPI = {
+    users: [
+        { id: 1, name: 'Alice', role: 'admin' },
+        { id: 2, name: 'Bob', role: 'user' }
+    ],
+    getUser: (id) => MockAPI.users.find(u => u.id == id) || { error: 'Not found' },
+    processPayment: (amount) => ({
+        transaction_id: 'TX_' + Math.random().toString(36).substr(2, 9),
+        status: 'SUCCESS',
+        amount: amount,
+        timestamp: new Date().toISOString()
+    })
+};
+
+function simulateRPC(method, params) {
+    logToNetwork('RPC Request', { method, params, jsonrpc: '2.0' });
+    
+    let result;
+    if (method === 'getUser') result = MockAPI.getUser(params);
+    else if (method === 'processPayment') result = MockAPI.processPayment(params);
+    else result = { error: 'Unknown method' };
+    
+    const response = { jsonrpc: '2.0', result, id: 1 };
+    logToNetwork('RPC Response', response);
+    
+    return response.result;
+}
+
+function simulateGRPC(service, request) {
+    logToNetwork('gRPC Request', { 
+        service, 
+        type: 'application/grpc+proto',
+        payload: request 
+    });
+    
+    // Simulate protobuf-style response
+    const responses = {
+        'User.GetProfile': { 
+            status: 'OK', 
+            code: 200, 
+            data: { ...MockAPI.getUser(request.id), verified: true } 
+        },
+        'Payment.Process': {
+            status: 'OK',
+            code: 200,
+            data: MockAPI.processPayment(request.amount)
+        }
+    };
+    
+    const response = responses[service] || { status: 'ERROR', code: 404, data: null };
+    
+    logToNetwork('gRPC Response', {
+        service,
+        type: 'application/grpc+proto',
+        payload: response
+    });
+    
+    return response.data;
+}
+
+function simulateFileRead(filename) {
+    logToNetwork('File Read', { action: 'fopen', path: filename });
+    
+    const mockFiles = {
+        'config.txt': 'database_host=localhost\napi_key=abc123',
+        'data.json': '{"items": [1, 2, 3], "total": 3}',
+        'log.txt': '[INFO] Application started\n[DEBUG] Loading config...'
+    };
+    
+    const content = mockFiles[filename] || `Content of ${filename}`;
+    logToNetwork('File Read Result', { status: 200, size: content.length });
+    
+    return content;
+}
+
+function logToNetwork(title, data) {
+    const entry = document.createElement('div');
+    entry.className = 'net-entry';
+    entry.innerHTML = `
+        <div class="net-header">
+            <strong>${title}</strong>
+            <span>${new Date().toLocaleTimeString()}</span>
+        </div>
+        <pre class="net-payload">${JSON.stringify(data, null, 2)}</pre>
+    `;
+    els.outputs.network.appendChild(entry);
+    els.outputs.network.scrollTop = els.outputs.network.scrollHeight;
+}
+
+// === STORAGE & UTILS ===
+function saveCode() {
+    localStorage.setItem('php_code', els.editor.value);
+    showToast('Code saved to browser storage', 'success');
+}
+
+function loadCode() {
+    const saved = localStorage.getItem('php_code');
+    if (saved) {
+        els.editor.value = saved;
+        showToast('Code loaded', 'success');
+        runCode();
+    } else {
+        showToast('No saved code found', 'info');
+    }
+}
+
+function changeTheme(theme) {
+    state.theme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('php_theme', theme);
+}
+
+function getDefaultCode() {
+    return `<?php
+// Welcome to PHP Learning Studio! 🎓
+// Select a lesson from the dropdown or write your own code.
+
+$name = "Developer";
+$version = 8.2;
+
+echo "<h1>Hello, $name!</h1>";
+echo "<p>Running PHP $version in your browser.</p>";
+
+// Try a simple loop
+echo "<ul>";
+for ($i = 1; $i <= 3; $i++) {
+    echo "<li>Lesson $i: PHP is fun!</li>";
+}
+echo "</ul>";
+
+// Check the Debugger tab to see variables!
+?>`;
+}
+
+// === LESSONS ===
+const lessons = {
+    hello: `<?php
+// Lesson: Hello World
+echo "<h2>Hello, World! 👋</h2>";
+echo "<p>This is your first PHP program.</p>";
+
+// PHP strings can use single or double quotes
+$greeting = 'Welcome';
+echo "<p>$greeting to PHP Learning Studio!</p>";
+
+// Concatenation uses the dot (.) operator
+$name = "Student";
+echo "<p>Hello, " . $name . "!</p>";
+?>`,
+
+    variables: `<?php
+// Lesson: Variables & Data Types
+
+// Strings
+$name = "Alice";
+$email = "alice@example.com";
+
+// Numbers
+$age = 25;
+$price = 19.99;
+
+// Booleans
+$isMember = true;
+$hasDiscount = false;
+
+// Null
+$optional = null;
+
+echo "<h2>Variable Demo</h2>";
+echo "<p><strong>Name:</strong> $name</p>";
+echo "<p><strong>Age:</strong> $age</p>";
+echo "<p><strong>Price:</strong> $$price</p>";
+echo "<p><strong>Member:</strong> " . ($isMember ? "Yes" : "No") . "</p>";
+
+// Type checking
+echo "<p><strong>Type of age:</strong> " . gettype($age) . "</p>";
+
+// Check Debugger tab to see all variables!
+?>`,
+
+    arrays: `<?php
+// Lesson: Arrays & Loops
+
+// Indexed array
+$colors = ["Red", "Green", "Blue"];
+
+echo "<h2>Color List</h2><ul>";
+foreach ($colors as $color) {
+    echo "<li>$color</li>";
+}
+echo "</ul>";
+
+// Associative array (key => value)
+$user = [
+    "name" => "Bob",
+    "email" => "bob@test.com",
+    "age" => 30
+];
+
+echo "<h2>User Profile</h2>";
+echo "<p><strong>Name:</strong> {$user['name']}</p>";
+echo "<p><strong>Email:</strong> {$user['email']}</p>";
+
+// Loop with keys
+echo "<h3>All Fields:</h3><ul>";
+foreach ($user as $key => $value) {
+    echo "<li>$key: $value</li>";
+}
+echo "</ul>";
+
+// Array functions
+echo "<p><strong>Total colors:</strong> " . count($colors) . "</p>";
+?>`,
+
+    functions: `<?php
+// Lesson: Functions
+
+// Basic function
+function greet($name) {
+    return "Hello, $name! 👋";
+}
+
+// Function with default parameter
+function calculateTotal($price, $tax = 0.1) {
+    return $price + ($price * $tax);
+}
+
+// Using the functions
+echo "<h2>Function Examples</h2>";
+echo "<p>" . greet("Alice") . "</p>";
+echo "<p>" . greet("Bob") . "</p>";
+
+$total = calculateTotal(100);
+echo "<p>Price: $100 + 10% tax = $$total</p>";
+
+// Anonymous function (closure)
+$multiply = function($a, $b) {
+    return $a * $b;
+};
+echo "<p>5 × 3 = " . $multiply(5, 3) . "</p>";
+?>`,
+
+    oop: `<?php
+// Lesson: Classes & OOP
+
+class Product {
+    public $name;
+    public $price;
+    
+    // Constructor
+    public function __construct($name, $price) {
+        $this->name = $name;
+        $this->price = $price;
+    }
+    
+    // Method
+    public function getInfo() {
+        return "{$this->name} costs \${$this->price}";
+    }
+    
+    // Method with parameter
+    public function applyDiscount($percent) {
+        $this->price = $this->price * (1 - $percent/100);
+        return "New price: \${$this->price}";
+    }
+}
+
+// Create objects
+$laptop = new Product("Laptop", 999);
+$mouse = new Product("Mouse", 29);
+
+echo "<h2>Product Catalog</h2>";
+echo "<p>• " . $laptop->getInfo() . "</p>";
+echo "<p>• " . $mouse->getInfo() . "</p>";
+
+// Apply discount
+echo "<p>" . $laptop->applyDiscount(15) . "</p>";
+
+// Inheritance example
+class DigitalProduct extends Product {
+    public $downloadUrl;
+    
+    public function __construct($name, $price, $url) {
+        parent::__construct($name, $price);
+        $this->downloadUrl = $url;
+    }
+    
+    public function getInfo() {
+        return parent::getInfo() . " [Digital]";
+    }
+}
+
+$ebook = new DigitalProduct("E-Book", 14.99, "https://example.com/book");
+echo "<p>• " . $ebook->getInfo() . "</p>";
+?>`,
+
+    json: `<?php
+// Lesson: JSON Handling
+
+// PHP array
+$data = [
+    "status" => "success",
+    "users" => [
+        ["id" => 1, "name" => "Alice"],
+        ["id" => 2, "name" => "Bob"]
+    ],
+    "meta" => [
+        "count" => 2,
+        "page" => 1
+    ]
+];
+
+echo "<h2>PHP Array → JSON</h2>";
+$json = json_encode($data, JSON_PRETTY_PRINT);
+echo "<pre>$json</pre>";
+
+// JSON string → PHP array
+$input = '{
+    "product": "Laptop",
+    "price": 999.99,
+    "inStock": true
+}';
+
+echo "<h2>JSON String → PHP</h2>";
+$obj = json_decode($input, true);
+
+echo "<p><strong>Product:</strong> {$obj['product']}</p>";
+echo "<p><strong>Price:</strong> \${$obj['price']}</p>";
+echo "<p><strong>In Stock:</strong> " . ($obj['inStock'] ? "Yes ✓" : "No ✗") . "</p>";
+
+// Working with decoded data
+if ($obj['inStock'] && $obj['price'] < 1000) {
+    echo "<p style='color:green'>✅ Great deal! Under $1000</p>";
+}
+?>`,
+
+    rpc: `<?php
+// Lesson: RPC Simulation
+// RPC = Remote Procedure Call (like calling a function on another server)
+
+echo "<h2>🔗 JSON-RPC Client Demo</h2>";
+
+// Simulate calling a remote "getUser" method
+echo "<h3>Fetching user data...</h3>";
+$user = rpc_call('getUser', 1);
+
+if (isset($user['error'])) {
+    echo "<p style='color:red'>Error: {$user['error']}</p>";
+} else {
+    echo "<p><strong>ID:</strong> {$user['id']}</p>";
+    echo "<p><strong>Name:</strong> {$user['name']}</p>";
+    echo "<p><strong>Role:</strong> {$user['role']}</p>";
+}
+
+// Simulate payment processing
+echo "<h3>Processing payment...</h3>";
+$payment = rpc_call('processPayment', 49.99);
+
+echo "<p><strong>Transaction:</strong> {$payment['transaction_id']}</p>";
+echo "<p><strong>Status:</strong> {$payment['status']}</p>";
+echo "<p><strong>Amount:</strong> \${$payment['amount']}</p>";
+
+// 👉 Check the "Network" tab to see the raw RPC requests/responses!
+?>`,
+
+    grpc: `<?php
+// Lesson: gRPC Simulation  
+// gRPC = Google's high-performance RPC framework (uses Protocol Buffers)
+
+echo "<h2>🚀 gRPC Client Demo</h2>";
+echo "<p>Simulating connection to microservice...</p>";
+
+// gRPC uses strongly-typed request objects (simulated as arrays here)
+$profileRequest = [
+    "username" => "developer_01",
+    "include_details" => true
+];
+
+echo "<h3>Calling: User.GetProfile</h3>";
+$profile = grpc_call('User.GetProfile', $profileRequest);
+
+echo "<pre>";
+print_r($profile);
+echo "</pre>";
+
+// Another gRPC call
+$paymentRequest = [
+    "amount" => 199.50,
+    "currency" => "USD",
+    "method" => "credit_card"
+];
+
+echo "<h3>Calling: Payment.Process</h3>";
+$paymentResult = grpc_call('Payment.Process', $paymentRequest);
+
+echo "<p><strong>Payment Code:</strong> {$paymentResult['code']}</p>";
+echo "<p><strong>Status:</strong> {$paymentResult['status']}</p>";
+
+// 👉 Check "Network" tab to see protobuf-style request/response!
+?>`,
+
+    files: `<?php
+// Lesson: File Operations (Simulated)
+// In real PHP, these functions read/write actual server files
+
+echo "<h2>📁 File System Demo</h2>";
+
+// Reading a file
+echo "<h3>Reading config.txt:</h3>";
+$config = file_get_contents('config.txt');
+echo "<pre>$config</pre>";
+
+// Reading JSON file
+echo "<h3>Reading data.json:</h3>";
+$jsonContent = file_get_contents('data.json');
+$data = json_decode($jsonContent, true);
+
+echo "<p><strong>Total items:</strong> {$data['total']}</p>";
+echo "<p><strong>Items:</strong> " . implode(", ", $data['items']) . "</p>";
+
+// In real PHP, you could also:
+// - file_put_contents('log.txt', 'New entry')
+// - file_exists('config.txt')
+// - unlink('temp.txt')
+
+echo "<p><em>👉 Check Network tab for file operation logs</em></p>";
+?>`
+};
+
+function loadLesson(key) {
+    if (lessons[key]) {
+        els.editor.value = lessons[key];
+        runCode();
+        // Switch to browser output tab
+        document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.output-panel').forEach(p => p.classList.remove('active'));
+        document.querySelector('.output-tab[data-tab="browser"]').classList.add('active');
+        els.outputs.browser.classList.add('active');
+    }
+}
+
+// === CSS ANIMATIONS FOR TOAST ===
+const style = document.createElement('style');
+style.textContent = `
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+`;
+document.head.appendChild(style);
+
+// === START ===
+init();
+</script>
+
+<!-- Add CSS for syntax highlighting hints in textarea (optional enhancement) -->
+<script>
+// Simple auto-indent for PHP
+els.editor.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+    }
+});
+</script>
+
+</body>
+</html>
