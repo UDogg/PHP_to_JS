@@ -404,70 +404,504 @@ async function runCode() {
     }
 }
 
-// --- BEGINNER MODE (Regex Simulation) ---
+// // --- BEGINNER MODE (Regex Simulation) ---
+// function runBeginner(code) {
+//     let js = cleanPHP(code);
+    
+//     // === STEP 1: Simulate PHP built-in functions ===
+//     const phpFunctions = `
+//         function gettype(v) {
+//             if (v === null) return "NULL";
+//             if (Array.isArray(v)) return "array";
+//             return typeof v;
+//         }
+//         function isset(v) { return v !== undefined && v !== null; }
+//         function empty(v) { return !v || v === "" || v === "0" || v === 0 || v === false; }
+//         function count(v) { return Array.isArray(v) ? v.length : (v ? 1 : 0); }
+//         function strlen(s) { return String(s).length; }
+//         function strtolower(s) { return String(s).toLowerCase(); }
+//         function strtoupper(s) { return String(s).toUpperCase(); }
+//         function trim(s) { return String(s).trim(); }
+//         function in_array(needle, haystack) { return Array.isArray(haystack) && haystack.includes(needle); }
+//         function array_push(arr, ...items) { if(Array.isArray(arr)) arr.push(...items); return arr.length; }
+//         function print_r(v, return_output) {
+//             const str = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+//             if (return_output) return str;
+//             browserOutput("<pre>" + str + "</pre>");
+//         }
+//         function var_dump(v) { browserOutput("<pre>" + gettype(v) + "(" + JSON.stringify(v) + ")</pre>"); }
+//     `;
+    
+//     // === STEP 2: Handle echo with string interpolation ===
+//     js = js.replace(/echo\s+(.*?);/gs, (match, content) => {
+//         // First, handle PHP string interpolation: "$var" → "${var}"
+//         // Match double-quoted strings containing $word
+//         let processed = content.replace(/"([^"]*\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*[^"]*)"/g, (str) => {
+//             // Convert "$name" to "${name}" for JS template literal style, but keep as concatenation
+//             return str.replace(/\$([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)/g, '" + $1 + "');
+//         });
+        
+//         // Handle single-quoted strings (no interpolation in PHP, so just convert to JS strings)
+//         processed = processed.replace(/'([^']*)'/g, '"$1"');
+        
+//         // Convert PHP concatenation (.) to JS (+), but be careful not to break the interpolation markers
+//         processed = processed.replace(/\s*\.\s*/g, ' + ');
+        
+//         return `browserOutput(${processed});`;
+//     });
+    
+//     // === STEP 3: Handle variables (just remove $) ===
+//     // Must happen AFTER echo processing to avoid breaking string interpolation
+//     js = js.replace(/\$(\w+)/g, '$1');
+    
+//     // === STEP 4: Handle arrays ===
+//     js = js.replace(/array\s*\((.*?)\)/gs, '[$1]');
+    
+//     // === STEP 5: Assemble and execute ===
+//     const fullCode = phpFunctions + '\n' + js;
+    
+//     try {
+//         const run = new Function('browserOutput', 'log', fullCode);
+//         run(
+//             (html) => els.outputs.browser.innerHTML += html,
+//             (msg) => logToConsole(msg, 'info')
+//         );
+//     } catch (e) {
+//         throw new Error(`Beginner mode parse error: ${e.message}\n\nGenerated JS:\n${fullCode}`);
+//     }
+// }
+
 function runBeginner(code) {
-    let js = cleanPHP(code);
-    
-    // === STEP 1: Simulate PHP built-in functions ===
-    const phpFunctions = `
-        function gettype(v) {
-            if (v === null) return "NULL";
-            if (Array.isArray(v)) return "array";
-            return typeof v;
+    const engine = new PHPEngine({ browserOutput, log: logToConsole });
+    engine.run(code);
+}
+
+class PHPTokenizer {
+    constructor(input) {
+        this.input = input;
+        this.pos = 0;
+        this.tokens = [];
+    }
+
+    // === Helpers ===
+    isAlpha(ch) {
+        return /[a-zA-Z_]/.test(ch);
+    }
+
+    isNum(ch) {
+        return /[0-9]/.test(ch);
+    }
+
+    peek(offset = 0) {
+        return this.input[this.pos + offset];
+    }
+
+    next() {
+        return this.input[this.pos++];
+    }
+
+    tokenize() {
+        const keywords = new Set([
+            'echo', 'foreach', 'as', 'for', 'while', 'if',
+            'else', 'elseif', 'function', 'return',
+            'true', 'false', 'null'
+        ]);
+
+        const twoCharOps = ['=>', '<=', '>=', '==', '!=', '++', '--'];
+        const singleCharOps = ['=', '+', '-', '*', '/', '<', '>', '(', ')', '{', '}', ';', ',', '.'];
+
+        while (this.pos < this.input.length) {
+            let ch = this.peek();
+
+            // === Whitespace ===
+            if (/\s/.test(ch)) {
+                this.next();
+                continue;
+            }
+
+            // === VARIABLE: $varName ===
+            if (ch === '$') {
+                this.next(); // consume $
+
+                let name = '';
+
+                if (!this.isAlpha(this.peek())) {
+                    throw new Error("Invalid variable name");
+                }
+
+                while (this.isAlpha(this.peek()) || this.isNum(this.peek())) {
+                    name += this.next();
+                }
+
+                this.tokens.push({
+                    type: 'VAR',
+                    value: '$' + name
+                });
+
+                continue;
+            }
+
+            // === STRINGS ===
+            if (ch === '"' || ch === "'") {
+                let quote = this.next();
+                let str = '';
+
+                while (this.pos < this.input.length && this.peek() !== quote) {
+                    str += this.next();
+                }
+
+                this.next(); // closing quote
+
+                this.tokens.push({
+                    type: 'STRING',
+                    value: str,
+                    quote
+                });
+
+                continue;
+            }
+
+            // === NUMBERS ===
+            if (this.isNum(ch)) {
+                let num = '';
+
+                while (this.isNum(this.peek())) {
+                    num += this.next();
+                }
+
+                this.tokens.push({
+                    type: 'NUMBER',
+                    value: Number(num)
+                });
+
+                continue;
+            }
+
+            // === IDENTIFIER / KEYWORD / LITERAL ===
+            if (this.isAlpha(ch)) {
+                let word = ch;
+
+                while (this.isAlpha(this.peek()) || this.isNum(this.peek())) {
+                    word += this.next();
+                }
+
+                const lower = word.toLowerCase();
+
+                // === BOOLEAN / NULL ===
+                if (lower === 'true' || lower === 'false') {
+                    this.tokens.push({
+                        type: 'BOOLEAN',
+                        value: lower === 'true'
+                    });
+                    continue;
+                }
+
+                if (lower === 'null') {
+                    this.tokens.push({
+                        type: 'NULL',
+                        value: null
+                    });
+                    continue;
+                }
+
+                // === KEYWORD ===
+                if (keywords.has(lower)) {
+                    this.tokens.push({
+                        type: lower.toUpperCase(),
+                        value: lower
+                    });
+                } else {
+                    this.tokens.push({
+                        type: 'IDENT',
+                        value: word
+                    });
+                }
+
+                continue;
+            }
+
+            // === MULTI-CHAR OPERATORS ===
+            const two = this.input.substr(this.pos, 2);
+
+            if (twoCharOps.includes(two)) {
+                this.tokens.push({
+                    type: two === '=>' ? 'ARROW' : 'OP',
+                    value: two
+                });
+
+                this.pos += 2;
+                continue;
+            }
+
+            // === SINGLE-CHAR OPERATORS ===
+            if (singleCharOps.includes(ch)) {
+                this.tokens.push({
+                    type: ch,
+                    value: ch
+                });
+
+                this.pos++;
+                continue;
+            }
+
+            // === FALLBACK (UNKNOWN CHAR) ===
+            this.tokens.push({
+                type: 'UNKNOWN',
+                value: ch
+            });
+
+            this.next();
         }
-        function isset(v) { return v !== undefined && v !== null; }
-        function empty(v) { return !v || v === "" || v === "0" || v === 0 || v === false; }
-        function count(v) { return Array.isArray(v) ? v.length : (v ? 1 : 0); }
-        function strlen(s) { return String(s).length; }
-        function strtolower(s) { return String(s).toLowerCase(); }
-        function strtoupper(s) { return String(s).toUpperCase(); }
-        function trim(s) { return String(s).trim(); }
-        function in_array(needle, haystack) { return Array.isArray(haystack) && haystack.includes(needle); }
-        function array_push(arr, ...items) { if(Array.isArray(arr)) arr.push(...items); return arr.length; }
-        function print_r(v, return_output) {
-            const str = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
-            if (return_output) return str;
-            browserOutput("<pre>" + str + "</pre>");
+
+        return this.tokens;
+    }
+}
+
+class PHPParser {
+    constructor(tokens) {
+        this.tokens = tokens;
+        this.pos = 0;
+    }
+
+    peek() { return this.tokens[this.pos]; }
+    next() { return this.tokens[this.pos++]; }
+
+    parse() {
+        const body = [];
+        while (this.pos < this.tokens.length) {
+            body.push(this.statement());
         }
-        function var_dump(v) { browserOutput("<pre>" + gettype(v) + "(" + JSON.stringify(v) + ")</pre>"); }
-    `;
+        return { type: 'PROGRAM', body };
+    }
+
+    statement() {
+    const tok = this.peek();
+
+    if (!tok) return;
+
+    if (tok.type === 'IDENT' && tok.value === 'echo') {
+        this.next();
+        const expr = this.expression([';']);
+        this.expect(';');
+        return { type: 'ECHO', expr };
+    }
+
+    if (tok.type === 'VAR' && this.peek(1)?.type === '=') {
+        return this.assignment();
+    }
+
+    if (tok.type === 'IDENT' && tok.value === 'foreach') {
+        return this.foreach();
+    }
+
+    return this.rawStatement();
+    }
+
+    rawStatement() {
+    let code = '';
+
+    while (this.peek() && this.peek().type !== ';') {
+        const tok = this.next();
+        code += tok.value || tok.type;
+        code += ' ';
+    }
+
+    this.expect(';');
+
+    return { type: 'RAW', code };
+    }   
+
+    assignment() {
+        const name = this.next().value;
+        this.expect('=');
+        const value = this.expression();
+        this.expect(';');
+
+        return { type: 'ASSIGN', name, value };
+    }
+
+    foreach() {
+        this.next(); // foreach
+        this.expect('(');
+
+        const arr = this.next().value;
+        const asTok = this.next();
+        if (asTok.value !== 'as') {
+            throw new Error("Expected 'as' in foreach");
+        }
+
+        const value = this.next().value;
+
+        this.expect(')');
+        this.expect('{');
+
+        const body = [];
+        while (this.peek().type !== '}') {
+            body.push(this.statement());
+        }
+
+        this.expect('}');
+
+        return { type: 'FOREACH', arr, value, body };
+    }
+
+    expression(stopTokens = [';']) {
+        let expr = '';
+
+        while (this.peek() && !stopTokens.includes(this.peek().type)) {
+            const tok = this.next();
+
+            if (tok.type === 'VAR') {
+                expr += tok.value.replace('$', '');
+            } else if (tok.type === 'STRING') {
+                expr += '`' + tok.value.slice(1, -1) + '`';
+            } else {
+                expr += tok.value || tok.type;
+            }
+
+            expr += ' ';
+        }
+
+        return { type: 'RAW_EXPR', value: expr.trim() };
+    }
+
+    primary() {
+        const tok = this.next();
+
+        if (tok.type === 'STRING') return { type: 'STRING', value: tok.value };
+        if (tok.type === 'NUMBER') return { type: 'NUMBER', value: tok.value };
+        if (tok.type === 'VAR') return { type: 'VAR', name: tok.value };
+
+        if (tok.type === '[') {
+            const items = [];
+            while (this.peek().type !== ']') {
+                items.push(this.expression());
+                if (this.peek().type === ',') this.next();
+            }
+            this.expect(']');
+            return { type: 'ARRAY', items };
+        }
+
+        throw new Error("Unexpected token in expression");
+    }
+
+    expect(type) {
+        const tok = this.next();
+        if (!tok || (tok.type !== type && tok.value !== type)) {
+            throw new Error(`Expected ${type}`);
+        }
+    }
+}
+
+class PHPInterpreter {
+    constructor(ctx) {
+        this.vars = {};
+        this.ctx = ctx;
+    }
+
+    run(ast) {
+        ast.body.forEach(stmt => this.exec(stmt));
+    }
+
+    exec(node) {
+        switch (node.type) {
+            case 'ASSIGN':
+                this.vars[node.name] = this.eval(node.value);
+                break;
+
+                case 'ECHO':
+                try {
+                    const result = new Function('vars', `
+                        with(vars) {
+                            return ${node.expr.value};
+                        }
+                    `)(this.vars);
+
+                    browserOutput(result);
+                } catch (e) {
+                    browserOutput("[Echo error]");
+                }
+                break;
+
+            case 'FOREACH':
+                const arr = this.vars[node.arr] || [];
+                arr.forEach(v => {
+                    this.vars[node.value] = v;
+                    node.body.forEach(s => this.exec(s));
+                });
+                break;
+
+            case 'RAW':
+                try {
+                    new Function('vars', `
+                        with(vars) {
+                            ${node.code}
+                        }
+                    `)(this.vars);
+                } catch (e) {
+                    console.warn("Skipped unsupported PHP:", node.code);
+                }
+                break;
+        }
+    }
     
-    // === STEP 2: Handle echo with string interpolation ===
-    js = js.replace(/echo\s+(.*?);/gs, (match, content) => {
-        // First, handle PHP string interpolation: "$var" → "${var}"
-        // Match double-quoted strings containing $word
-        let processed = content.replace(/"([^"]*\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*[^"]*)"/g, (str) => {
-            // Convert "$name" to "${name}" for JS template literal style, but keep as concatenation
-            return str.replace(/\$([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)/g, '" + $1 + "');
+
+    eval(node) {
+        switch (node.type) {
+            case 'STRING':
+                return this.interpolate(node.value);
+
+            case 'NUMBER':
+                return node.value;
+
+            case 'VAR':
+                return this.vars[node.name];
+
+            case 'ARRAY':
+                return node.items.map(i => this.eval(i));
+
+            case 'CONCAT':
+                return this.eval(node.left) + this.eval(node.right);
+        }
+    }
+
+    interpolate(str) {
+        return str.replace(/\$([a-zA-Z_]\w*)/g, (_, v) => {
+            return this.vars[v] ?? '';
         });
-        
-        // Handle single-quoted strings (no interpolation in PHP, so just convert to JS strings)
-        processed = processed.replace(/'([^']*)'/g, '"$1"');
-        
-        // Convert PHP concatenation (.) to JS (+), but be careful not to break the interpolation markers
-        processed = processed.replace(/\s*\.\s*/g, ' + ');
-        
-        return `browserOutput(${processed});`;
-    });
-    
-    // === STEP 3: Handle variables (just remove $) ===
-    // Must happen AFTER echo processing to avoid breaking string interpolation
-    js = js.replace(/\$(\w+)/g, '$1');
-    
-    // === STEP 4: Handle arrays ===
-    js = js.replace(/array\s*\((.*?)\)/gs, '[$1]');
-    
-    // === STEP 5: Assemble and execute ===
-    const fullCode = phpFunctions + '\n' + js;
-    
+    }
+}
+
+class PHPEngine {
+    constructor(ctx) {
+        this.ctx = ctx;
+    }
+
+    run(code) {
+        code = code.replace(/<\?php|\?>/g, '');
+
+        const tokenizer = new PHPTokenizer(code);
+        const tokens = tokenizer.tokenize();
+
+        const parser = new PHPParser(tokens);
+        const ast = parser.parse();
+
+        const interpreter = new PHPInterpreter(this.ctx);
+        interpreter.run(ast);
+    }
+}
+
+function runBeginner(code) {
     try {
-        const run = new Function('browserOutput', 'log', fullCode);
-        run(
-            (html) => els.outputs.browser.innerHTML += html,
-            (msg) => logToConsole(msg, 'info')
-        );
+        const engine = new PHPEngine({
+            browserOutput: (html) => els.outputs.browser.innerHTML += html,
+            log: (msg) => logToConsole(msg, 'info')
+        });
+
+        engine.run(code);
+
     } catch (e) {
-        throw new Error(`Beginner mode parse error: ${e.message}\n\nGenerated JS:\n${fullCode}`);
+        throw new Error(`Tokenizer Engine Error: ${e.message}`);
     }
 }
 
