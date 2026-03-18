@@ -60,6 +60,13 @@
 #define MAX_TOKEN_LEN     4096
 #define EMIT_LINE_SIZE    4096
 #define INITIAL_BUF_LINES 16384
+#define TMP_NAME_LEN 32
+
+static void newtmp(char *buf) {
+    if (tmp_ctr > 1000000000)
+        compiler_error("too many temporaries");
+    snprintf(buf, TMP_NAME_LEN, "t%d", tmp_ctr++);
+}
 
 /* ============================================================
  * Token types
@@ -225,7 +232,7 @@ static void write_output(void) {
  * ========================================================== */
 static void advance(void) {
     int ch = fgetc(infile);
-    if (ch == EOF) { at_eof = true; cur_char = 0; }
+    if (cur_char == EOF) { at_eof = true; cur_char = 0; }
     else           { cur_char = ch; if (ch == '\n') line_num++; }
 }
 
@@ -665,7 +672,7 @@ static void parse_statement(void) {
     if (cur_tok.type == TOK_ECHO) {
         emit("{");
         get_next_token();
-        char tmp[16]; parse_expression(tmp);
+        char tmp[TMP_NAME_LEN]; parse_expression(tmp);
         emit("phc_echo(%s);", tmp);
         while (cur_tok.type == TOK_COMMA) {
             get_next_token();
