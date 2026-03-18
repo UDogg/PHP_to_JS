@@ -180,9 +180,9 @@ static void emit(const char *fmt, ...) {
 }
 
 /* Write a unique C identifier into buf (needs >= 16 bytes) */
-static void newtmp(char *buf) {
-    snprintf(buf, 16, "t%d", tmp_ctr++);
-}
+// static void newtmp(char *buf) {
+//     snprintf(buf, 16, "t%d", tmp_ctr++);
+// }
 
 /* ============================================================
  * C-string body escaper
@@ -232,7 +232,10 @@ static void write_output(void) {
  * ========================================================== */
 static void advance(void) {
     int ch = fgetc(infile);
-    if (cur_char == EOF) { at_eof = true; cur_char = 0; }
+    if (ch == EOF) {
+        at_eof = true;
+        cur_char = EOF;
+    }
     else           { cur_char = ch; if (ch == '\n') line_num++; }
 }
 
