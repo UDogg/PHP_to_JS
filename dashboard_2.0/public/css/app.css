@@ -1,0 +1,220 @@
+button a {
+    text-decoration: none;
+    color: rgb(255, 255, 255);
+}
+
+/* .fa-solid {
+    margin: 10px;
+    font-size: large;
+} */
+
+::-webkit-scrollbar-track {
+    background-color: #f5f5f5;
+    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, .3)
+}
+
+::-webkit-scrollbar {
+    background-color: #f5f5f5;
+    height: 7px;
+    width: 7px
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #000000;
+    border-radius: 10px;
+}
+
+.required::after {
+	content: ' *';
+	color: red;
+  }
+
+  .modal-backdrop
+{
+    opacity: 0.1 !important;
+}
+
+/* css for policy status report */
+.btn_wrapper{
+    gap: 5px;
+}
+.dt-button-collection a.dt-button {
+    background-color: #12a1c9 !important;
+    color: black !important;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin: 2px;
+    padding: 5px 10px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+.dt-button-collection a.dt-button:hover,
+.dt-button-collection a.dt-button.active {
+    background-color: #12a1c9 !important;
+    color: black !important;
+}
+       
+ #sendDates {
+    height: 20%;
+
+}
+
+.filterButton.active {
+    background-color: grey;
+    color: white;
+   padding: 10px;
+}
+
+.filterdiv {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filterdiv button {
+    font-size: 14px;
+    border: solid 1px grey;
+    padding: 10px;
+    background-color: transparent;
+    font-weight: 500;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+.filterdiv button:hover {
+    background-color: grey;
+    color: aliceblue;
+}
+
+.Stagediv {
+
+    flex-wrap: wrap;
+    padding-top: 10px;
+    gap: 20px;
+}
+
+.Stagediv div {
+    min-width: 20%;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+
+}
+
+/* close policy status report  */
+
+.dropdown-content.show {
+    display: block;
+}
+
+  
+  .dropbtn:hover, .dropbtn:focus {
+    background-color: #17a2b8;
+  }
+  
+  #myInput {
+    box-sizing: border-box;
+ 
+    background-position: 14px 12px;
+    background-repeat: no-repeat;
+    font-size: 16px;
+    padding: 14px 20px 12px 45px;
+    border: none;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  #myInput:focus {outline: 3px solid #ddd;}
+  
+  .dropdown {
+    /* margin-left: 46%; */
+    position: relative;
+    display: inline-block;
+    top: 0px;
+    right: 0px;
+  }
+  
+  .dropdown-content {
+    margin-left: -208px;
+    display: none;
+    position: absolute;
+    background-color: #f6f6f6;
+    min-width: 230px;
+    overflow: auto;
+    border: 1px solid #ddd;
+    z-index: 1;
+  }
+  
+  .dropdown-content a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+  }
+  
+  .dropdown a:hover {background-color: #ddd;}
+  
+  .show {display: block;}
+
+    .dropdown {
+        position: relative;
+        display: inline-block;
+        float: right;
+        margin-right: -10px;
+    }
+
+    .dropbtn {
+        background-color: #12a1c9;
+        color: white;
+        font-size: 16px;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        padding: 5px;
+        font-size: 16px;
+        border: none;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        border-bottom-left-radius: 5px;
+        border-bottom-right-radius: 5px;
+    }
+
+    .dropbtn:active {
+        background-color: #0d7591; /* Darker shade */
+    }
+
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: #f9f9f9;
+        min-width: 200px;
+        box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+        z-index: 1;
+        right: 0; /* Align dropdown to the right */
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .dropdown-content .form-group {
+        padding: 10px;
+    }
+
+    .dropdown-content input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0 22px 0;
+        display: inline-block;
+        border: none;
+        background: #f1f1f1;
+    }
+
+    .dropdown-content input[type="text"]:focus {
+        background-color: #e01010;
+        outline: none;
+    }
+
+  
+
